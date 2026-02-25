@@ -33,12 +33,13 @@ test.describe.serial("HappyFlow", () => {
     const { response, json } = await wheelClient.spin(user.accessToken!);
 
     const spinResult = json.response.SpinResult;
-    const coinsBefore = user.userBalance?.Coins;
+    expect(user.userBalance).toBeDefined();
+    const coinsBefore = user.userBalance!.Coins;
     const coinsAfter = spinResult.UserBalance.Coins;
     const rewards = spinResult.Rewards;
     
-    expect(response.status()).toBe(200);
-    
+    expect(response.ok()).toBe(true);
+
     const coinReward = rewards.find(
       (r) => r.RewardDefinitionType === 1 && r.RewardResourceType === 1,
     );
@@ -57,10 +58,9 @@ test.describe.serial("HappyFlow", () => {
     const authClient = new AuthClient(request);
     const { response, json } = await authClient.login(user);
     const reLoginData = json.response.LoginResponse;
-    expect(response.status()).toBe(200);
+    expect(response.ok()).toBe(true);
     expect(reLoginData.AccountCreated).toBe(false);
     expect(reLoginData.AccessToken).toBeTruthy();
-    expect(reLoginData.AccessToken).not.toBe(null);
     expect(reLoginData.AccessToken).not.toBe(user.accessToken);
     expect(reLoginData.UserBalance).toBeDefined();
     expect(reLoginData.UserBalance.Energy).toBe(user.userBalance!.Energy);

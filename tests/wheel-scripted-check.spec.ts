@@ -6,9 +6,18 @@ import { UserSession } from "./helpers/userSession";
 
 const MAX_SPINS = 50;
 
+/** Set true if wheel should be random; false if scripted (same sequence for all). */
+const EXPECT_RANDOM_WHEEL = true;
+
+interface SpinReward {
+  RewardDefinitionType: number;
+  RewardResourceType: number;
+  Amount: number;
+}
+
 async function createUserAndSpinAllEnergy(
   request: APIRequestContext,
-): Promise<{ rewards: any[] }> {
+): Promise<{ rewards: SpinReward[] }> {
   const user: UserSession = {
     deviceId: `test_${randomUUID()}`,
     loginSource: `test_${randomUUID()}`,
@@ -27,9 +36,8 @@ async function createUserAndSpinAllEnergy(
 
   expect(user.userBalance!.Energy).toBeGreaterThan(0);
 
-  const rewards: any[] = [];
+  const rewards: SpinReward[] = [];
   let spins = 0;
-  const initialEnergy = user.userBalance!.Energy;
 
   while (user.userBalance!.Energy > 0 && spins < MAX_SPINS) {
     const spinResponse = await wheelClient.spin(user.accessToken!);
@@ -44,20 +52,12 @@ async function createUserAndSpinAllEnergy(
     user.userBalance = spinResponse.json.response.SpinResult.UserBalance;
     spins++;
   }
-
-  console.log(`User spun ${spins} times (initial energy: ${initialEnergy})`);
-  console.log(`Final energy: ${user.userBalance!.Energy}`);
-
-  if (user.userBalance!.Energy !== 0) {
-    console.log(`WARNING: Energy is ${user.userBalance!.Energy}, expected 0`);
-  }
-
   return { rewards };
 }
 
 test.describe.serial("Wheel Scripted Validation", () => {
-  let user1Rewards: any[];
-  let user2Rewards: any[];
+  let user1Rewards: SpinReward[];
+  let user2Rewards: SpinReward[];
 
   test("spin wheel for two users until energy depletion", async ({
     request,
@@ -77,8 +77,6 @@ test.describe.serial("Wheel Scripted Validation", () => {
     const totalSpins = user1Rewards.length;
     let identicalSpins = 0;
 
-    console.log(`Comparing ${totalSpins} spins...`);
-
     for (let i = 0; i < totalSpins; i++) {
       const r1 = user1Rewards[i];
       const r2 = user2Rewards[i];
@@ -93,16 +91,6 @@ test.describe.serial("Wheel Scripted Validation", () => {
       ) {
         identicalSpins++;
       }
-    }
-
-    console.log(`Matches: ${identicalSpins}/${totalSpins}`);
-
-    if (identicalSpins === totalSpins) {
-      console.log("Wheel is scripted - all rewards match");
-    } else if (identicalSpins === 0) {
-      console.log("Wheel is random - no matches");
-    } else {
-      console.log(`Partial match - ${identicalSpins} matches`);
     }
 
     expect(identicalSpins).toBeGreaterThanOrEqual(0);

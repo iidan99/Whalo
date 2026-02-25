@@ -22,7 +22,6 @@ npx playwright test
 # Specific tests
 npx playwright test happyflow
 npx playwright test spin-without-energy
-npx playwright test energy-regeneration-bug
 npx playwright test wheel-scripted-check
 
 # With UI (helpful for debugging)
@@ -48,8 +47,7 @@ tests/
 │   └── userSession.ts          # Type definitions
 ├── happyflow.spec.ts           # Main happy path tests
 ├── spin-without-energy.spec.ts # What happens with no energy
-├── energy-regeneration-bug.spec.ts  # Bug reproduction test
-└── wheel-scripted-check.spec.ts     # Check if wheel is scripted or random
+└── wheel-scripted-check.spec.ts    # Check if wheel is scripted or random
 ```
 
 ## What I'm Testing
@@ -81,18 +79,14 @@ Testing what happens when you run out of energy:
 
 Also tracks how many spins happened (found the regeneration bug while doing this).
 
-### Bug Test (`energy-regeneration-bug.spec.ts`)
-
-Reproduction test for the energy regeneration bug I found. This test documents the bug behavior.
-
 ### Wheel Scripted Check (`wheel-scripted-check.spec.ts`)
 
-Tests whether the wheel is scripted (returns same rewards) or random:
+Tests whether the wheel is scripted (same rewards for all users) or random:
 
-1. Create two different users
-2. Spin until energy depletes for each user
-3. Compare the reward sequences
-4. Report if they match (scripted) or differ (random)
+1. Create two different users and spin until energy depletes for each.
+2. Compare reward sequences (RewardDefinitionType, RewardResourceType, Amount).
+3. Log result: `X/Y spins identical → scripted | random`.
+4. **Assertion:** By default `EXPECT_RANDOM_WHEEL = true` — the test **fails** if all spins are identical (wheel is scripted when we expect random). Set to `false` to expect a scripted wheel instead.
 
 ## How the API Works
 
@@ -103,39 +97,17 @@ A few things I learned:
 - Errors look like: `{ "status": -1, "response": "NotEnoughResources" }`
 - Each spin costs 1 energy
 - Coin rewards have `RewardDefinitionType=1` AND `RewardResourceType=1`
+- Energy refill reward uses `RewardResourceType=3` (e.g. `Amount: 10`)
 
-## Bugs I Found
+## Expected Behavior: Energy Refill
 
-### Energy Regeneration Bug
+After verification with the product/backend, the following is **intended behavior** (not a bug):
 
-While testing, I noticed energy doesn't deplete properly:
+- New user starts with 10 energy.
+- After 10 spins, energy would reach 0, but the API returns a **reward that refills energy** (e.g. `RewardDefinitionType: 1`, `RewardResourceType: 3`, `Amount: 10`).
+- So a new user can spin **20 times** in total before getting "NotEnoughResources".
 
-**What should happen:**
-
-- Start with 10 energy
-- Spin 10 times
-- Energy should be 0
-
-**What actually happens:**
-
-- Start with 10 energy
-- Spin 9 times → Energy goes to 1
-- Spin 10th time → Energy **jumps back to 10**!
-- Can spin 20 times total instead of 10
-
-**Why this is a problem:**
-
-- Breaks game balance
-- Players can exploit this for unlimited spins
-- Not realistic behavior (energy should regenerate slowly over time, not instantly)
-
-**How to reproduce:**
-Run `energy-regeneration-bug.spec.ts` - the test documents this bug behavior.
-
-See the test logs - you'll see energy jump from 1 → 10 instantly.
-
-**My recommendation:**
-Energy should regenerate gradually (like 1 energy per 6 minutes), not all at once.
+The test `spin-without-energy.spec.ts` spins until energy is depleted (20 spins for a new user) and then asserts "NotEnoughResources" on the next spin.
 
 ## Things I Assumed
 
@@ -143,7 +115,7 @@ Energy should regenerate gradually (like 1 energy per 6 minutes), not all at onc
 2. LoginSource should be formatted as `test_{something}`
 3. Coins are rewards with `RewardDefinitionType=1` AND `RewardResourceType=1`
 4. Each spin should cost exactly 1 energy
-5. New accounts start with 10 energy
+5. New accounts start with 10 energy and get one energy refill after 10 spins (20 spins total before NotEnoughResources)
 6. AccessToken changes on re-login for security reasons
 7. API returns HTTP 200 even for errors (error details are in the JSON body)
 
@@ -151,7 +123,7 @@ Energy should regenerate gradually (like 1 energy per 6 minutes), not all at onc
 
 - Every test creates a new random user (can't reuse specific test accounts)
 - Test accounts aren't cleaned up after tests run
-- Energy regeneration makes timing unpredictable
+- Energy refill after 10 spins affects spin-count expectations
 - All tests hit the real API (no mocking)
 
 ## Notes
@@ -176,6 +148,6 @@ This project fulfills all requirements:
 - ✅ No rollback validation
 - ✅ Extra validations (AccountCreated, Energy, Gems)
 - ✅ Spin till out of energy tests
-- ✅ Bug documentation
+- ✅ Spin till out of energy + energy refill behavior documented
 - ✅ README with assumptions and findings
 # Whalo

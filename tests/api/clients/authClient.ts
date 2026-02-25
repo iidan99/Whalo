@@ -2,6 +2,7 @@ import { APIRequestContext } from "@playwright/test";
 import { randomUUID } from "crypto";
 import { UserSession } from "../../helpers/userSession";
 import { RequestApi } from "../requests/requestApi";
+import { config } from "../../config/config";
 
 export class AuthClient {
   private requestApi: RequestApi;
@@ -17,7 +18,7 @@ export class AuthClient {
     };
 
     return await this.requestApi.post(
-      "/api/frontend/login/v4/login",
+      config.endpoints.login,
       {
         "Content-Type": "application/json",
       },
